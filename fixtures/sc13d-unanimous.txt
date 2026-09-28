@@ -1,0 +1,35 @@
+<SEC-HEADER>
+<SUBJECT-COMPANY>
+<COMPANY-DATA>
+<CONFORMED-NAME>APPLE INC
+<CIK>0000320193
+</COMPANY-DATA>
+</SUBJECT-COMPANY>
+<FILED-BY>
+<COMPANY-DATA>
+<CONFORMED-NAME>NOT THE INDEX FILER
+<CIK>0000999999
+</COMPANY-DATA>
+</FILED-BY>
+</SEC-HEADER>
+<DOCUMENT>
+<TYPE>SC 13D
+<TEXT>
+<XML>
+<edgarSubmission>
+  <formData>
+    <reportingPersons>
+      <reportingPersonInfo>
+        <aggregateAmountOwned>1,000,000</aggregateAmountOwned>
+        <percentOfClass>5.2</percentOfClass>
+      </reportingPersonInfo>
+      <reportingPersonInfo>
+        <aggregateAmountOwned>1000000</aggregateAmountOwned>
+        <percentOfClass>5.2</percentOfClass>
+      </reportingPersonInfo>
+    </reportingPersons>
+  </formData>
+</edgarSubmission>
+</XML>
+</TEXT>
+</DOCUMENT>

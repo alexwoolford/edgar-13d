@@ -1,0 +1,30 @@
+[package]
+name = "edgar-13d"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Nightly EDGAR Schedule 13D / 13G beneficial-ownership labels in SQLite"
+license = "MIT"
+repository = "https://github.com/alexwoolford/edgar-13d"
+
+[[bin]]
+name = "edgar-13d"
+path = "src/main.rs"
+
+[lib]
+name = "edgar_13d"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+capturable-state = { git = "https://github.com/alexwoolford/capturable-state", tag = "v0.1.1" }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "gzip"] }
+roxmltree = "0.20"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"

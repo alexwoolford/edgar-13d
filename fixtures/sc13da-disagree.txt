@@ -1,0 +1,29 @@
+<SEC-HEADER>
+<SUBJECT-COMPANY>
+<COMPANY-DATA>
+<CONFORMED-NAME>MICROSOFT CORP
+<CIK>0000789019
+</COMPANY-DATA>
+</SUBJECT-COMPANY>
+</SEC-HEADER>
+<DOCUMENT>
+<TYPE>SC 13D/A
+<TEXT>
+<XML>
+<edgarSubmission>
+  <formData>
+    <reportingPersons>
+      <reportingPersonInfo>
+        <aggregateAmountOwned>100</aggregateAmountOwned>
+        <percentOfClass>5.2</percentOfClass>
+      </reportingPersonInfo>
+      <reportingPersonInfo>
+        <aggregateAmountOwned>250</aggregateAmountOwned>
+        <percentOfClass>6.0</percentOfClass>
+      </reportingPersonInfo>
+    </reportingPersons>
+  </formData>
+</edgarSubmission>
+</XML>
+</TEXT>
+</DOCUMENT>
