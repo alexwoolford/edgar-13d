@@ -43,4 +43,4 @@ A missing daily `master.YYYYMMDD.idx` is 404, or 403 on Sat/Sun. Both are an emp
 
 ## Announce / nudge
 
-`install()` on work sqlite. Announce stem is `edgar-13d`. Host `ReadWritePaths` are a later mosaic pass. This crate does not install a timer.
+`install()` on work sqlite. Announce stem is `edgar-13d`. The oneshot may write `/var/lib/edgar-13d`, `/var/lib/state-capture/announce`, and `/run/state`. The timer is `edgar-13d-ingest.timer` at 09:00 UTC.
