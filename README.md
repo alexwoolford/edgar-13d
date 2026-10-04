@@ -15,4 +15,6 @@ cargo run --release -- lookup 0000320193
 
 Ingest exits 0 only when `ingest_runs.status` is `ok`. `partial` and `error` exit 1.
 
-Pin `capturable-state` git tag `v0.1.1`. Never `path = "../capturable-state"`. No systemd unit in this pass.
+Pin `capturable-state` git tag `v0.1.1`. Never `path = "../capturable-state"`.
+
+Host: `cargo build --release` then `sudo ./deploy/install.sh`. Daily ops: [docs/DAILY_OPS.md](docs/DAILY_OPS.md). The timer is 09:00 UTC and is enabled without `--now`.

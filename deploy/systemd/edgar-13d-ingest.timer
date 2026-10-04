@@ -1,0 +1,12 @@
+[Unit]
+Description=EDGAR Schedule 13D/13G beneficial-ownership ingest
+Documentation=file:///opt/edgar-13d/docs/DAILY_OPS.md
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=edgar-13d-ingest.service
+
+[Install]
+WantedBy=timers.target
