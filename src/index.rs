@@ -116,6 +116,42 @@ pub fn accession_from_filename(filename: &str) -> String {
     normalize_accession(stem)
 }
 
+/// The daily index lists an accession under the holder and again under the issuer.
+/// The holder is the accession's first 10 digits. One row per accession is fetched.
+pub fn prefer_holder(rows: Vec<IndexRow>) -> Vec<IndexRow> {
+    let mut grouped: Vec<(String, Vec<IndexRow>)> = Vec::new();
+    for row in rows {
+        let accession = accession_from_filename(&row.filename);
+        if let Some((_, group)) = grouped.iter_mut().find(|(key, _)| key == &accession) {
+            group.push(row);
+        } else {
+            grouped.push((accession, vec![row]));
+        }
+    }
+    grouped
+        .into_iter()
+        .map(|(_, group)| pick_holder(group))
+        .collect()
+}
+
+fn pick_holder(group: Vec<IndexRow>) -> IndexRow {
+    let prefix = accession_cik(&accession_from_filename(&group[0].filename));
+    group
+        .iter()
+        .find(|row| row.cik == prefix)
+        .cloned()
+        .unwrap_or_else(|| group.into_iter().next().expect("accession group"))
+}
+
+fn accession_cik(accession: &str) -> String {
+    let digits: String = accession
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .take(10)
+        .collect();
+    pad_cik(&digits)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
