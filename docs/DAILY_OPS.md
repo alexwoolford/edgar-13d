@@ -38,13 +38,13 @@ sudo ./deploy/install.sh
 
 Do not hand-edit sqlite.
 
-Weekend master-index **404 is success** (`status=ok`, zero filings). From this OCI IP an unpublished weekend path is often **403** rather than 404 — Sat/Sun 403 is the same success. Weekday index 403 is `status=error` (UA/Akamai), **including weekday US holidays**. Index 5xx and transport errors retry (four attempts, exponential backoff) then `status=error` (unit failed).
+Weekend master-index **404 is success** (`status=ok`, zero filings). From this OCI IP an unpublished weekend path is often **403** rather than 404 — Sat/Sun 403 is the same success. Weekday index 403 is `status=error` (UA/Akamai), **including weekday US holidays**. Index 5xx and transport errors retry (four attempts, exponential backoff) then `status=error` (unit failed). An HTTP 200 body with no `CIK|` header is the same error, not an empty day.
 
 A filing with no `SUBJECT-COMPANY`, or more than one, increments `filings_failed` and stores no row (`partial`, **exit 1**). A NULL `percent_of_class` is not a failure: the XML was absent or the reporting persons disagreed. Do not sum those persons.
 
 ## Backfill (`--from` / `--to`)
 
-Not the first night. Invoke `run-ingest.sh` with `EDGAR_INGEST_FROM` / `EDGAR_INGEST_TO` outside the timer. Weekday 403 stops the loop.
+Not the first night. Invoke `run-ingest.sh` with `EDGAR_INGEST_FROM` / `EDGAR_INGEST_TO` outside the timer. An index error (weekday 403, transport failure, or a 200 body with no `CIK|` header) stops the loop.
 
 ## SEC fair access
 

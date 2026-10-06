@@ -36,6 +36,11 @@ pub fn is_schedule_13dg(form: &str) -> bool {
     )
 }
 
+/// True when `body` is a daily master index, not an interstitial or empty 200.
+pub fn has_cik_header(body: &str) -> bool {
+    body.lines().any(|line| line.starts_with("CIK|"))
+}
+
 pub fn parse_master_index(body: &str) -> Vec<IndexRow> {
     let mut rows = Vec::new();
     let mut in_table = false;
@@ -117,7 +122,9 @@ mod tests {
 
     #[test]
     fn parses_fixture_and_keeps_only_13d_13g() {
-        let rows = parse_master_index(include_str!("../fixtures/master.idx"));
+        let body = include_str!("../fixtures/master.idx");
+        assert!(has_cik_header(body));
+        let rows = parse_master_index(body);
         assert_eq!(rows.len(), 5);
         assert_eq!(rows[0].form, "SC 13D");
         assert_eq!(rows[0].cik, "0000902664");
