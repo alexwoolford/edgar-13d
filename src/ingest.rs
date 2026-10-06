@@ -6,7 +6,7 @@ use chrono::{Datelike, Days, NaiveDate, Utc, Weekday};
 use crate::db::{upsert_filing, upsert_run, WorkDb};
 use crate::filing::{filing_from_submission, Filing};
 use crate::http::{filing_url, Fetcher};
-use crate::index::{master_index_url, parse_master_index, IndexRow};
+use crate::index::{has_cik_header, master_index_url, parse_master_index, IndexRow};
 
 #[derive(Debug, Clone, Default)]
 pub struct IngestStats {
@@ -32,7 +32,19 @@ pub fn ingest_day(
         ..IngestStats::default()
     };
 
-    let idx_resp = fetcher.get(&index_url).context("GET master index")?;
+    let idx_resp = match fetcher.get(&index_url) {
+        Ok(resp) => resp,
+        Err(err) => {
+            stats.status = "error".into();
+            if let Err(run_err) = finish(db, &as_of, started, &stats) {
+                tracing::error!(
+                    error = %run_err,
+                    "failed to record ingest_runs after index error"
+                );
+            }
+            return Err(err).context("GET master index");
+        }
+    };
     if index_absent_is_ok(date, idx_resp.status) {
         tracing::info!(
             status = idx_resp.status,
@@ -46,6 +58,11 @@ pub fn ingest_day(
         stats.status = "error".into();
         finish(db, &as_of, started, &stats)?;
         anyhow::bail!("master index HTTP {} for {index_url}", idx_resp.status);
+    }
+    if !has_cik_header(&idx_resp.body) {
+        stats.status = "error".into();
+        finish(db, &as_of, started, &stats)?;
+        anyhow::bail!("master index body has no CIK header for {index_url}");
     }
 
     let rows = parse_master_index(&idx_resp.body);
@@ -297,6 +314,39 @@ mod tests {
         let stats = ingest_day(&mut t.db, date, &mut fetcher).unwrap();
         assert_eq!(stats.status, "ok");
         assert_eq!(stats.filings_seen, 0);
+    }
+
+    #[test]
+    fn index_transport_error_records_status_error() {
+        let mut t = test_db();
+        let date = NaiveDate::from_ymd_opt(2026, 9, 11).unwrap();
+        let mut fetcher = MapFetcher {
+            urls: HashMap::new(),
+        };
+        let err = ingest_day(&mut t.db, date, &mut fetcher).unwrap_err();
+        assert!(err.to_string().contains("GET master index"));
+        assert_eq!(last_run(&t.db).unwrap().unwrap().status, "error");
+        assert_eq!(last_run(&t.db).unwrap().unwrap().filings_seen, 0);
+    }
+
+    #[test]
+    fn index_200_without_cik_header_is_error() {
+        let mut t = test_db();
+        let date = NaiveDate::from_ymd_opt(2026, 9, 11).unwrap();
+        let url = master_index_url(date);
+        let mut fetcher = MapFetcher {
+            urls: HashMap::from([(
+                url,
+                HttpResponse {
+                    status: 200,
+                    body: "<html>access denied</html>".into(),
+                },
+            )]),
+        };
+        let err = ingest_day(&mut t.db, date, &mut fetcher).unwrap_err();
+        assert!(err.to_string().contains("no CIK header"));
+        assert_eq!(last_run(&t.db).unwrap().unwrap().status, "error");
+        assert!(lookup_filings(&t.db, "320193").unwrap().is_empty());
     }
 
     #[test]

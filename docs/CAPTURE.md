@@ -31,7 +31,7 @@ These are **labels**, not leads. A 13G is not a quieter 13D.
 
 Do not `collect --snapshot` this database.
 
-A missing daily `master.YYYYMMDD.idx` is 404, or 403 on Sat/Sun. Both are an empty successful ingest. Weekday index 403 is an error and stops a range. Filing `.txt` 403/404 increment `filings_failed`. Do not guess an issuer.
+A missing daily `master.YYYYMMDD.idx` is 404, or 403 on Sat/Sun. Both are an empty successful ingest. Weekday index 403, a transport failure after retries, or an HTTP 200 body with no `CIK|` header is an error, records `ingest_runs.status=error`, and stops a range. Filing `.txt` 403/404 increment `filings_failed`. Do not guess an issuer.
 
 ## Clocks
 
