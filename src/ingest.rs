@@ -6,7 +6,7 @@ use chrono::{Datelike, Days, NaiveDate, Utc, Weekday};
 use crate::db::{upsert_filing, upsert_run, WorkDb};
 use crate::filing::{filing_from_submission, Filing};
 use crate::http::{filing_url, Fetcher};
-use crate::index::{has_cik_header, master_index_url, parse_master_index, IndexRow};
+use crate::index::{has_cik_header, master_index_url, parse_master_index, prefer_holder, IndexRow};
 
 #[derive(Debug, Clone, Default)]
 pub struct IngestStats {
@@ -67,6 +67,7 @@ pub fn ingest_day(
 
     let rows = parse_master_index(&idx_resp.body);
     stats.filings_seen = rows.len() as i64;
+    let rows = prefer_holder(rows);
 
     for row in &rows {
         match resolve_filing(fetcher, row, &mut stats) {
@@ -412,6 +413,47 @@ mod tests {
         assert_eq!(again.filings_upserted, 0);
         let n2 = outbox_count(&t.db).unwrap();
         assert_eq!(n2, n1 + 1, "unchanged filings must not emit extra outbox");
+    }
+
+    #[test]
+    fn duplicate_accession_keeps_prefix_cik_and_skips_issuer_line() {
+        let mut t = test_db();
+        let date = NaiveDate::from_ymd_opt(2026, 10, 5).unwrap();
+        let index = "\
+CIK|Company Name|Form Type|Date Filed|Filename
+--------------------------------------------------------------------------------
+320193|APPLE INC|SCHEDULE 13D|20261005|edgar/data/320193/0000902664-26-000100.txt
+902664|MFN PARTNERS LP|SCHEDULE 13D|20261005|edgar/data/902664/0000902664-26-000100.txt
+";
+        let holder = filing_url("edgar/data/902664/0000902664-26-000100.txt");
+        let mut fetcher = MapFetcher {
+            urls: HashMap::from([
+                (
+                    master_index_url(date),
+                    HttpResponse {
+                        status: 200,
+                        body: index.into(),
+                    },
+                ),
+                (
+                    holder,
+                    HttpResponse {
+                        status: 200,
+                        body: include_str!("../fixtures/sc13d-unanimous.txt").into(),
+                    },
+                ),
+            ]),
+        };
+        let stats = ingest_day(&mut t.db, date, &mut fetcher).unwrap();
+        assert_eq!(stats.filings_seen, 2);
+        assert_eq!(stats.txt_ok, 1);
+        assert_eq!(stats.filings_failed, 0);
+        assert_eq!(stats.filings_upserted, 1);
+        let rows = lookup_filings(&t.db, "0000902664-26-000100").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].filer_cik, "0000902664");
+        assert_eq!(rows[0].filer_name, "MFN PARTNERS LP");
+        assert_eq!(rows[0].issuer_cik, "0000320193");
     }
 
     #[test]

@@ -21,7 +21,7 @@ Spec: [mosaic docs/research/EDGAR_13D.md](https://github.com/alexwoolford/mosaic
 
 Identity: one row per `accession`. An amendment is a **new** accession. Identical rerun must not emit a new outbox row for `filings` (`ON CONFLICT … WHERE` any column differs). Soft-delete unused in v1.
 
-The index CIK is `filer_cik`. Issuer CIK is the single subject-company block. Live headers print `SUBJECT COMPANY:` / `CENTRAL INDEX KEY:` / `COMPANY CONFORMED NAME:`, and the `<SUBJECT-COMPANY>` tag form still counts. Zero subjects, or more than one, is `filings_failed` and no row. If `FILED-BY` disagrees with the index CIK, the index CIK stays.
+The index CIK is `filer_cik`. The index lists an accession under the holder and again under the issuer; the holder is the accession prefix. Issuer CIK is the single subject-company block. Live headers print `SUBJECT COMPANY:` / `CENTRAL INDEX KEY:` / `COMPANY CONFORMED NAME:`, and the `<SUBJECT-COMPANY>` tag form still counts. Zero subjects, or more than one, is `filings_failed` and no row. If `FILED-BY` disagrees with the index CIK, the index CIK stays.
 
 `percent_of_class` and `aggregate_shares` are TEXT, and NULL unless every Schedule 13D/13G XML reporting person states the same pair. Differing persons are not summed. Form 3/4/5 `<ownershipDocument>` is ignored. Missing XML leaves both columns NULL.
 
