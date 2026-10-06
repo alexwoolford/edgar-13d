@@ -22,9 +22,17 @@ pub fn master_index_url(date: NaiveDate) -> String {
 }
 
 pub fn is_schedule_13dg(form: &str) -> bool {
+    // The daily index prints both the short name and `SCHEDULE 13D` / `SCHEDULE 13G`.
     matches!(
         form.trim().to_ascii_uppercase().as_str(),
-        "SC 13D" | "SC 13D/A" | "SC 13G" | "SC 13G/A"
+        "SC 13D"
+            | "SC 13D/A"
+            | "SC 13G"
+            | "SC 13G/A"
+            | "SCHEDULE 13D"
+            | "SCHEDULE 13D/A"
+            | "SCHEDULE 13G"
+            | "SCHEDULE 13G/A"
     )
 }
 
@@ -110,21 +118,25 @@ mod tests {
     #[test]
     fn parses_fixture_and_keeps_only_13d_13g() {
         let rows = parse_master_index(include_str!("../fixtures/master.idx"));
-        assert_eq!(rows.len(), 4);
+        assert_eq!(rows.len(), 5);
         assert_eq!(rows[0].form, "SC 13D");
         assert_eq!(rows[0].cik, "0000902664");
         assert_eq!(rows[0].filed_date, "2026-09-11");
         assert_eq!(rows[1].form, "SC 13G");
         assert_eq!(rows[2].form, "SC 13D/A");
         assert_eq!(rows[3].form, "SC 13D");
+        assert_eq!(rows[4].form, "SCHEDULE 13G/A");
         assert!(rows.iter().all(|r| is_schedule_13dg(&r.form)));
     }
 
     #[test]
     fn drops_13f_and_8k() {
         assert!(!is_schedule_13dg("SC 13F"));
+        assert!(!is_schedule_13dg("SCHEDULE 13F"));
         assert!(!is_schedule_13dg("8-K"));
         assert!(!is_schedule_13dg("4"));
         assert!(is_schedule_13dg("sc 13g/a"));
+        assert!(is_schedule_13dg("schedule 13d"));
+        assert!(is_schedule_13dg("SCHEDULE 13G/A"));
     }
 }
