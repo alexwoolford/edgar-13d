@@ -250,6 +250,13 @@ mod tests {
                 body: include_str!("../fixtures/sc13d-two-subjects.txt").into(),
             },
         );
+        urls.insert(
+            filing_url("edgar/data/1067983/0001067983-26-000010.txt"),
+            HttpResponse {
+                status: 200,
+                body: include_str!("../fixtures/sc13g-no-xml.txt").into(),
+            },
+        );
         MapFetcher { urls }
     }
 
@@ -317,10 +324,10 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2026, 9, 11).unwrap();
         let mut fetcher = fixture_fetcher();
         let stats = ingest_day(&mut t.db, date, &mut fetcher).unwrap();
-        assert_eq!(stats.filings_seen, 4);
-        assert_eq!(stats.txt_ok, 3);
+        assert_eq!(stats.filings_seen, 5);
+        assert_eq!(stats.txt_ok, 4);
         assert_eq!(stats.filings_failed, 1);
-        assert_eq!(stats.filings_upserted, 3);
+        assert_eq!(stats.filings_upserted, 4);
         assert_eq!(stats.status, "partial");
 
         let apple = lookup_filings(&t.db, "320193").unwrap();
@@ -332,7 +339,7 @@ mod tests {
         assert_eq!(apple[0].source, "txt");
         assert!(lookup_filings(&t.db, "999999").unwrap().is_empty());
 
-        let passive = lookup_filings(&t.db, "0000104169").unwrap();
+        let passive = lookup_filings(&t.db, "0000104169-26-000070").unwrap();
         assert_eq!(passive.len(), 1);
         assert_eq!(passive[0].form, "SC 13G");
         assert!(passive[0].percent_of_class.is_none());
@@ -343,6 +350,11 @@ mod tests {
         assert_eq!(amendment[0].is_amendment, 1);
         assert!(amendment[0].percent_of_class.is_none());
         assert!(amendment[0].aggregate_shares.is_none());
+
+        let long_name = lookup_filings(&t.db, "0001067983-26-000010").unwrap();
+        assert_eq!(long_name.len(), 1);
+        assert_eq!(long_name[0].form, "SCHEDULE 13G/A");
+        assert!(long_name[0].percent_of_class.is_none());
 
         let n1 = outbox_count(&t.db).unwrap();
         let mut fetcher = fixture_fetcher();

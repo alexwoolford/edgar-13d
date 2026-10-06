@@ -25,7 +25,7 @@ The index CIK is `filer_cik`. Issuer CIK is the single `SUBJECT-COMPANY` block. 
 
 `percent_of_class` and `aggregate_shares` are TEXT, and NULL unless every Schedule 13D/13G XML reporting person states the same pair. Differing persons are not summed. Form 3/4/5 `<ownershipDocument>` is ignored. Missing XML leaves both columns NULL.
 
-`filings_upserted` counts accession rows written this run, not index lines. `filings_seen` counts index rows kept (`SC 13D`, `SC 13D/A`, `SC 13G`, `SC 13G/A` only).
+`filings_upserted` counts accession rows written this run, not index lines. `filings_seen` counts index rows kept. The daily index uses `SCHEDULE 13D` / `SCHEDULE 13G` as well as `SC 13D` / `SC 13G` (and the `/A` forms).
 
 These are **labels**, not leads. A 13G is not a quieter 13D.
 
