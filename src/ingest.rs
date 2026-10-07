@@ -6,7 +6,9 @@ use chrono::{Datelike, Days, NaiveDate, Utc, Weekday};
 use crate::db::{upsert_filing, upsert_run, WorkDb};
 use crate::filing::{filing_from_submission, Filing};
 use crate::http::{filing_url, Fetcher};
-use crate::index::{has_cik_header, master_index_url, parse_master_index, prefer_holder, IndexRow};
+use crate::index::{
+    group_by_accession, has_cik_header, master_index_url, parse_master_index, IndexRow,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct IngestStats {
@@ -67,10 +69,10 @@ pub fn ingest_day(
 
     let rows = parse_master_index(&idx_resp.body);
     stats.filings_seen = rows.len() as i64;
-    let rows = prefer_holder(rows);
+    let groups = group_by_accession(rows);
 
-    for row in &rows {
-        match resolve_filing(fetcher, row, &mut stats) {
+    for group in &groups {
+        match resolve_filing(fetcher, group, &mut stats) {
             Ok(filing) => {
                 if let Err(err) = persist_filing(db, &filing, &mut stats) {
                     stats.status = "error".into();
@@ -85,8 +87,8 @@ pub fn ingest_day(
             }
             Err(err) => {
                 tracing::warn!(
-                    cik = %row.cik,
-                    filename = %row.filename,
+                    cik = %group[0].cik,
+                    filename = %group[0].filename,
                     error = %err,
                     "filing failed"
                 );
@@ -136,15 +138,15 @@ fn finish(
 
 fn resolve_filing(
     fetcher: &mut dyn Fetcher,
-    row: &IndexRow,
+    group: &[IndexRow],
     stats: &mut IngestStats,
 ) -> Result<Filing> {
-    let url = filing_url(&row.filename);
+    let url = filing_url(&group[0].filename);
     let txt = fetcher.get(&url)?;
     if txt.status != 200 {
         anyhow::bail!("filing HTTP {} for {url}", txt.status);
     }
-    let filing = filing_from_submission(&txt.body, row)?;
+    let filing = filing_from_submission(&txt.body, group)?;
     stats.txt_ok += 1;
     Ok(filing)
 }
@@ -416,16 +418,26 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_accession_keeps_prefix_cik_and_skips_issuer_line() {
+    fn prefix_issuer_line_stores_the_other_filer() {
         let mut t = test_db();
         let date = NaiveDate::from_ymd_opt(2026, 10, 5).unwrap();
         let index = "\
 CIK|Company Name|Form Type|Date Filed|Filename
 --------------------------------------------------------------------------------
-320193|APPLE INC|SCHEDULE 13D|20261005|edgar/data/320193/0000902664-26-000100.txt
-902664|MFN PARTNERS LP|SCHEDULE 13D|20261005|edgar/data/902664/0000902664-26-000100.txt
+905148|HERTZ GLOBAL HOLDINGS, INC|SCHEDULE 13D/A|20261005|edgar/data/905148/0000905148-26-004357.txt
+999001|CK Amarillo LP|SCHEDULE 13D/A|20261005|edgar/data/999001/0000905148-26-004357.txt
 ";
-        let holder = filing_url("edgar/data/902664/0000902664-26-000100.txt");
+        let body = "\
+<SEC-HEADER>
+<SUBJECT-COMPANY>
+<COMPANY-DATA>
+<CONFORMED-NAME>HERTZ GLOBAL HOLDINGS, INC
+<CIK>0000905148
+</COMPANY-DATA>
+</SUBJECT-COMPANY>
+</SEC-HEADER>
+";
+        let fetched = filing_url("edgar/data/905148/0000905148-26-004357.txt");
         let mut fetcher = MapFetcher {
             urls: HashMap::from([
                 (
@@ -436,10 +448,10 @@ CIK|Company Name|Form Type|Date Filed|Filename
                     },
                 ),
                 (
-                    holder,
+                    fetched,
                     HttpResponse {
                         status: 200,
-                        body: include_str!("../fixtures/sc13d-unanimous.txt").into(),
+                        body: body.into(),
                     },
                 ),
             ]),
@@ -449,11 +461,60 @@ CIK|Company Name|Form Type|Date Filed|Filename
         assert_eq!(stats.txt_ok, 1);
         assert_eq!(stats.filings_failed, 0);
         assert_eq!(stats.filings_upserted, 1);
-        let rows = lookup_filings(&t.db, "0000902664-26-000100").unwrap();
+        let rows = lookup_filings(&t.db, "0000905148-26-004357").unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].filer_cik, "0000902664");
-        assert_eq!(rows[0].filer_name, "MFN PARTNERS LP");
-        assert_eq!(rows[0].issuer_cik, "0000320193");
+        assert_eq!(rows[0].filer_cik, "0000999001");
+        assert_eq!(rows[0].filer_name, "CK Amarillo LP");
+        assert_eq!(rows[0].issuer_cik, "0000905148");
+    }
+
+    #[test]
+    fn prefix_matches_neither_line_and_stores_the_holder() {
+        let mut t = test_db();
+        let date = NaiveDate::from_ymd_opt(2026, 10, 5).unwrap();
+        let index = "\
+CIK|Company Name|Form Type|Date Filed|Filename
+--------------------------------------------------------------------------------
+1929561|RXO, Inc.|SCHEDULE 13D|20261005|edgar/data/1929561/0001193125-26-414547.txt
+1732960|MFN Partners, LP|SCHEDULE 13D|20261005|edgar/data/1732960/0001193125-26-414547.txt
+";
+        let body = "\
+<SEC-HEADER>
+<SUBJECT-COMPANY>
+<COMPANY-DATA>
+<CONFORMED-NAME>RXO, Inc.
+<CIK>0001929561
+</COMPANY-DATA>
+</SUBJECT-COMPANY>
+</SEC-HEADER>
+";
+        let fetched = filing_url("edgar/data/1929561/0001193125-26-414547.txt");
+        let mut fetcher = MapFetcher {
+            urls: HashMap::from([
+                (
+                    master_index_url(date),
+                    HttpResponse {
+                        status: 200,
+                        body: index.into(),
+                    },
+                ),
+                (
+                    fetched,
+                    HttpResponse {
+                        status: 200,
+                        body: body.into(),
+                    },
+                ),
+            ]),
+        };
+        let stats = ingest_day(&mut t.db, date, &mut fetcher).unwrap();
+        assert_eq!(stats.filings_failed, 0);
+        assert_eq!(stats.txt_ok, 1);
+        let rows = lookup_filings(&t.db, "0001193125-26-414547").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].filer_cik, "0001732960");
+        assert_eq!(rows[0].filer_name, "MFN Partners, LP");
+        assert_eq!(rows[0].issuer_cik, "0001929561");
     }
 
     #[test]
