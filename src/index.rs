@@ -116,9 +116,8 @@ pub fn accession_from_filename(filename: &str) -> String {
     normalize_accession(stem)
 }
 
-/// The daily index lists an accession under the holder and again under the issuer.
-/// The holder is the accession's first 10 digits. One row per accession is fetched.
-pub fn prefer_holder(rows: Vec<IndexRow>) -> Vec<IndexRow> {
+/// One group per accession, in first-seen order. The index lists the holder and the issuer.
+pub fn group_by_accession(rows: Vec<IndexRow>) -> Vec<Vec<IndexRow>> {
     let mut grouped: Vec<(String, Vec<IndexRow>)> = Vec::new();
     for row in rows {
         let accession = accession_from_filename(&row.filename);
@@ -128,28 +127,22 @@ pub fn prefer_holder(rows: Vec<IndexRow>) -> Vec<IndexRow> {
             grouped.push((accession, vec![row]));
         }
     }
-    grouped
-        .into_iter()
-        .map(|(_, group)| pick_holder(group))
-        .collect()
+    grouped.into_iter().map(|(_, group)| group).collect()
 }
 
-fn pick_holder(group: Vec<IndexRow>) -> IndexRow {
-    let prefix = accession_cik(&accession_from_filename(&group[0].filename));
-    group
-        .iter()
-        .find(|row| row.cik == prefix)
-        .cloned()
-        .unwrap_or_else(|| group.into_iter().next().expect("accession group"))
-}
-
-fn accession_cik(accession: &str) -> String {
-    let digits: String = accession
-        .chars()
-        .filter(|c| c.is_ascii_digit())
-        .take(10)
-        .collect();
-    pad_cik(&digits)
+/// The duplicate index line is the issuer. The filer is the other line.
+/// Several non-issuer lines resolve only when one matches `FILED-BY`.
+pub fn choose_filer<'a>(
+    group: &'a [IndexRow],
+    issuer_cik: &str,
+    filed_by_cik: Option<&str>,
+) -> Option<&'a IndexRow> {
+    let others: Vec<&IndexRow> = group.iter().filter(|row| row.cik != issuer_cik).collect();
+    match others.len() {
+        0 => group.first(),
+        1 => Some(others[0]),
+        _ => filed_by_cik.and_then(|cik| others.into_iter().find(|row| row.cik == cik)),
+    }
 }
 
 #[cfg(test)]

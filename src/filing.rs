@@ -3,7 +3,7 @@
 use anyhow::{bail, Result};
 
 use crate::header::parse_header;
-use crate::index::{accession_from_filename, IndexRow};
+use crate::index::{accession_from_filename, choose_filer, IndexRow};
 use crate::xml::{ownership_numbers, OwnershipNumbers};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,7 +22,7 @@ pub struct Filing {
     pub source: String,
 }
 
-pub fn filing_from_submission(body: &str, row: &IndexRow) -> Result<Filing> {
+pub fn filing_from_submission(body: &str, rows: &[IndexRow]) -> Result<Filing> {
     let header = parse_header(body);
     if header.subjects.len() != 1 {
         bail!(
@@ -34,23 +34,26 @@ pub fn filing_from_submission(body: &str, row: &IndexRow) -> Result<Filing> {
     if subject.cik.chars().all(|c| c == '0') {
         bail!("issuer CIK missing");
     }
+    let Some(filer) = choose_filer(rows, &subject.cik, header.filed_by_cik.as_deref()) else {
+        bail!("filer CIK: several index lines are not the issuer and none match FILED-BY");
+    };
     let (aggregate_shares, percent_of_class) = match ownership_numbers(body) {
         OwnershipNumbers::Unanimous { shares, percent } => (Some(shares), Some(percent)),
         OwnershipNumbers::Absent | OwnershipNumbers::Disagree => (None, None),
     };
-    let form = row.form.trim().to_string();
+    let form = filer.form.trim().to_string();
     Ok(Filing {
-        accession: accession_from_filename(&row.filename),
+        accession: accession_from_filename(&filer.filename),
         form: form.clone(),
         is_amendment: i64::from(form.to_ascii_uppercase().ends_with("/A")),
-        filed_date: row.filed_date.clone(),
+        filed_date: filer.filed_date.clone(),
         issuer_cik: subject.cik.clone(),
         issuer_name: subject.name.clone(),
-        filer_cik: row.cik.clone(),
-        filer_name: row.company_name.clone(),
+        filer_cik: filer.cik.clone(),
+        filer_name: filer.company_name.clone(),
         percent_of_class,
         aggregate_shares,
-        filename: row.filename.clone(),
+        filename: filer.filename.clone(),
         source: "txt".into(),
     })
 }
